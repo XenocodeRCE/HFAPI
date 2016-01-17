@@ -1,5 +1,0 @@
-C:\Users\User\Source\HFAPI\HFAPI\bin\Debug\HFAPI.dll
-C:\Users\User\Source\HFAPI\HFAPI\bin\Debug\HFAPI.pdb
-C:\Users\User\Source\HFAPI\HFAPI\obj\Debug\HFAPI.csprojResolveAssemblyReference.cache
-C:\Users\User\Source\HFAPI\HFAPI\obj\Debug\HFAPI.dll
-C:\Users\User\Source\HFAPI\HFAPI\obj\Debug\HFAPI.pdb

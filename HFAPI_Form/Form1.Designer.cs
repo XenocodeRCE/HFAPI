@@ -46,6 +46,7 @@
             this.lblUsernameChanges = new System.Windows.Forms.Label();
             this.pictureBox1 = new System.Windows.Forms.PictureBox();
             this.lblGroupe = new System.Windows.Forms.Label();
+            this.richTextBox1 = new System.Windows.Forms.RichTextBox();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
             this.SuspendLayout();
             // 
@@ -73,7 +74,6 @@
             this.txtPassword.Name = "txtPassword";
             this.txtPassword.Size = new System.Drawing.Size(100, 20);
             this.txtPassword.TabIndex = 2;
-            this.txtPassword.Text = "Paradoxum123456789";
             // 
             // label1
             // 
@@ -212,11 +212,20 @@
             this.lblGroupe.TabIndex = 19;
             this.lblGroupe.Text = "Groupe : ";
             // 
+            // richTextBox1
+            // 
+            this.richTextBox1.Location = new System.Drawing.Point(387, 117);
+            this.richTextBox1.Name = "richTextBox1";
+            this.richTextBox1.Size = new System.Drawing.Size(419, 96);
+            this.richTextBox1.TabIndex = 20;
+            this.richTextBox1.Text = "";
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(446, 309);
+            this.ClientSize = new System.Drawing.Size(818, 309);
+            this.Controls.Add(this.richTextBox1);
             this.Controls.Add(this.lblGroupe);
             this.Controls.Add(this.pictureBox1);
             this.Controls.Add(this.lblUsernameChanges);
@@ -266,6 +275,7 @@
         private System.Windows.Forms.Label lblUsernameChanges;
         private System.Windows.Forms.PictureBox pictureBox1;
         private System.Windows.Forms.Label lblGroupe;
+        private System.Windows.Forms.RichTextBox richTextBox1;
     }
 }
 

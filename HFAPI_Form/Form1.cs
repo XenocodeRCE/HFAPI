@@ -34,7 +34,6 @@ namespace HFAPI_Form
             lblReported.Text += User.ReportedMessage;
             lblGroupe.Text += User.Groupe;
 
-            User.Bet("test", 50, User.BetType.Public);
         }
     }
 }
