@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.IO;
+using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace HFAPI
 {
@@ -179,7 +181,7 @@ namespace HFAPI
         /// </summary>
         /// <param name="montant">En int, minimum 50 maximum 10,000</param>
         /// <remark>Renvoie True quand le pari est gagné, False quand ce dernier est perdu</remark>
-        public static bool Bet(int montant)
+        public static bool Bet(string montant)
         {
             var betpoints = montant.ToString();
 
@@ -244,6 +246,45 @@ namespace HFAPI
             var result = System.Text.Encoding.UTF8.GetString(response);
         }
 
+
+        /// <summary>
+        /// Permet de récupérer certaines informations d'un membre
+        /// </summary>
+        /// <param name="pseudo">le pseudonyme du membre</param>
+        /// <returns>Ratio, Merçi, Reputation, Message report, Credit, Groupe d'affichage</returns>
+        public static List<string> GetMemberinfo(string pseudo)
+        {
+            try
+            {
+                var infos = new List<string>();
+                var ID = Nickname2ID(pseudo);
+                var panel = MyWebClient.DownloadString("http://hack-free.net/User-" + ID);
+                Userpanel = panel;
+                var ratio = GetRatio();
+                var msg = Getpostcount();
+                var merci = GetMerci();
+                var rep = GetReputation();
+                var reportedmessage = GetReportedMessage();
+                var credit = GetCredit();
+                var maingroupe = GetGroupe();
+                infos.Add(ratio);
+                infos.Add(msg.ToString());
+                infos.Add(merci);
+                infos.Add(rep);
+                infos.Add(reportedmessage);
+                infos.Add(credit);
+                infos.Add(maingroupe);
+                return infos;
+            }
+            catch (Exception)
+            {
+
+                return null;
+            }
+           
+        }
+
+
         /// <summary>
         /// Permet de parier une somme de crédit X contre un utilisateur
         /// </summary>
@@ -251,7 +292,7 @@ namespace HFAPI
         /// <param name="montant">En int, minimum 50 maximum 10,000</param>
         /// <param name="bet">Choisir le <type cref="BetType"/> de partie : Public, Private, System</param>
         /// <remark>Ne permet pas de savoir si on gagne ou on perd !</remark>
-        public static void Bet(string username, int montant, BetType bet)
+        public static void Bet(string username, string montant, BetType bet)
         {
             var betpoints = montant.ToString();
 
@@ -303,7 +344,6 @@ namespace HFAPI
             var result = System.Text.Encoding.UTF8.GetString(response);
         }
 
-
         /// <summary>
         /// Les types de parties
         /// </summary>
@@ -314,6 +354,574 @@ namespace HFAPI
             System
         }
 
+        /// <summary>
+        /// Permet de récupérer le pseudonyme à partir de l'UserID
+        /// </summary>
+        /// <returns></returns>
+        public static string ID2Nickname(string memberID)
+        {
+            try
+            {
+                string nickname;
+                var profile = MyWebClient.DownloadString("http://hack-free.net/User-" + memberID);
+                //http://hack-free.net/User-1094
+                //<span class="active">Profil de `Kysura~_^</span>
+                var src1 = "<span class=\"active\">Profil de ";
+                var src2 = "</span>";
+                var entries2 = Helpers.GetStringInBetween(src1, src2,
+                    profile, false, false);
+                nickname = entries2;
+                return nickname;
+            }
+            catch (Exception)
+            {
+
+                return null; // 404 -> profile delet
+            }
+            
+        }
+
+        /// <summary>
+        /// Permet de récupérer l'userID à partir d'un pseudo
+        /// </summary>
+        /// <param name="pseudo"></param>
+        /// <returns></returns>
+        public static string Nickname2ID(string pseudo)
+        {
+            string ID = "";
+
+            var response = MyWebClient.UploadValues("http://hack-free.net/memberlist.php", new NameValueCollection()
+           {
+               { "username", pseudo },
+               { "website", ""},
+               { "sort", "lastvisit" },
+               { "order", "ascending" },
+               { "submit", "Rechercher" }
+           });
+            var result = System.Text.Encoding.UTF8.GetString(response);
+            //<td class="trow1"><a href="http://hack-free.net/User-84">Prometheus</a><br/>
+            var src1 = "<td class=\"trow1\"><a href=\"http://hack-free.net/User-";
+            var src2 = "><span";
+            var entries2 = Helpers.GetStringInBetween(src1, src2,
+                result, false, false);
+            //84\"
+            entries2 = entries2.Trim('"');
+            entries2 = entries2.Replace(@"\", "");
+
+            ID = entries2;
+            return ID;
+        }
+
+        /// <summary>
+        /// Permet de récupérer la liste des utilisateurs ayant répondu dernièrement aux sujet
+        /// </summary>
+        /// <returns>Un array de string comprenant tous les utilisateurs</returns>
+        public static List<string> LastReplyByUsers()
+        {
+            List<string> xx = new List<string>();
+            var entries =
+                Helpers.GetStringInBetween("<td>Sujet</td><td>Heure&nbsp;</td><td>Auteur</td><td>Derniers</td><td>Forum</td>",
+                    "</table></td>", Forum, false, false);
+            var x = 0;
+            while (x < 15)
+            {
+                entries = entries.Replace("<tr class=\"trow1 smalltext\" style=\"\">", null);
+                entries = entries.Replace("<td>", null);
+                entries = entries.Replace(
+                    "<img src=\"/images/prostats/ps_minion.gif\" style=\"vertical-align:middle;\" alt=\"\"/>&nbsp;",
+                    null);
+                entries = entries.Replace(
+                    "<img src=\"/images/prostats/ps_minioff.gif\" style=\"vertical-align:middle;\" alt=\"\"/>&nbsp;",
+                    null);
+                entries = entries.Replace("</tr>", null);
+                x++;
+            }
+            File.WriteAllText(AppDomain.CurrentDomain.BaseDirectory + @"\" + "HFB_users2.txt",entries);
+            var file_users = AppDomain.CurrentDomain.BaseDirectory + @"\" + "HFB_users2.txt";
+            var sr = new StreamReader(file_users).ReadToEnd();
+            var user12delet = Helpers.GetStringInBetween("<strong>", "</strong>", sr, true, true);
+            sr.Replace(sr, user12delet);
+            //
+            var user1 = GetLine(file_users, 8);
+            var cbdefois = Regex.Matches(user1, "<strong>").Count;
+            if (cbdefois == 2)
+            {
+                string userB = Helpers.GetStringInBetween("<strong>", "</strong>", user1, true, true);
+                userB = userB.Replace("<del>", "");
+                userB = userB.Replace("</del>", "");
+                userB = userB.Replace("<strong>", "");
+                userB = userB.Replace("</strong>", "");
+                user1 = user1.Replace("<strong>"+userB+"</strong>", null);
+                if (!xx.Contains(userB))
+                {
+                    xx.Add(userB);
+                }
+            }
+            string user = Helpers.GetStringInBetween("<strong>", "</strong>", user1, false, false);
+            user.Replace("<del>", "");
+            user.Replace("</del>", "");
+            if (!xx.Contains(user))
+            {
+                xx.Add(user);
+            }
+            //
+            user1 = GetLine(file_users, 15);
+            cbdefois = Regex.Matches(user1, "<strong>").Count;
+            if (cbdefois == 2)
+            {
+                string userB = Helpers.GetStringInBetween("<strong>", "</strong>", user1, true, true);
+                userB = userB.Replace("<del>", "");
+                userB = userB.Replace("</del>", "");
+                userB = userB.Replace("<strong>", "");
+                userB = userB.Replace("</strong>", "");
+                user1 = user1.Replace("<strong>" + userB + "</strong>", null);
+                if (!xx.Contains(userB))
+                {
+                    xx.Add(userB);
+                }
+            }
+            user = Helpers.GetStringInBetween("<strong>", "</strong>", user1, false, false);
+            user.Replace("<del>", "");
+            user.Replace("</del>", "");
+            if (!xx.Contains(user))
+            {
+                xx.Add(user);
+            }
+            //
+            user1 = GetLine(file_users, 22);
+            cbdefois = Regex.Matches(user1, "<strong>").Count;
+            if (cbdefois == 2)
+            {
+                string userB = Helpers.GetStringInBetween("<strong>", "</strong>", user1, true, true);
+                userB = userB.Replace("<del>", "");
+                userB = userB.Replace("</del>", "");
+                userB = userB.Replace("<strong>", "");
+                userB = userB.Replace("</strong>", "");
+                user1 = user1.Replace("<strong>" + userB + "</strong>", null);
+                if (!xx.Contains(userB))
+                {
+                    xx.Add(userB);
+                }
+            }
+            user = Helpers.GetStringInBetween("<strong>", "</strong>", user1, false, false);
+            user.Replace("<del>", "");
+            user.Replace("</del>", "");
+            if (!xx.Contains(user))
+            {
+                xx.Add(user);
+            }
+            //
+            user1 = GetLine(file_users, 29);
+            cbdefois = Regex.Matches(user1, "<strong>").Count;
+            if (cbdefois == 2)
+            {
+                string userB = Helpers.GetStringInBetween("<strong>", "</strong>", user1, true, true);
+                userB = userB.Replace("<del>", "");
+                userB = userB.Replace("</del>", "");
+                userB = userB.Replace("<strong>", "");
+                userB = userB.Replace("</strong>", "");
+                user1 = user1.Replace("<strong>" + userB + "</strong>", null);
+                if (!xx.Contains(userB))
+                {
+                    xx.Add(userB);
+                }
+            }
+            user = Helpers.GetStringInBetween("<strong>", "</strong>", user1, false, false);
+            user.Replace("<del>", "");
+            user.Replace("</del>", "");
+            if (!xx.Contains(user))
+            {
+                xx.Add(user);
+            }
+            //
+            user1 = GetLine(file_users, 36);
+            cbdefois = Regex.Matches(user1, "<strong>").Count;
+            if (cbdefois == 2)
+            {
+                string userB = Helpers.GetStringInBetween("<strong>", "</strong>", user1, true, true);
+                userB = userB.Replace("<del>", "");
+                userB = userB.Replace("</del>", "");
+                userB = userB.Replace("<strong>", "");
+                userB = userB.Replace("</strong>", "");
+                user1 = user1.Replace("<strong>" + userB + "</strong>", null);
+                if (!xx.Contains(userB))
+                {
+                    xx.Add(userB);
+                }
+            }
+            user = Helpers.GetStringInBetween("<strong>", "</strong>", user1, false, false);
+            user.Replace("<del>", "");
+            user.Replace("</del>", "");
+            if (!xx.Contains(user))
+            {
+                xx.Add(user);
+            }
+            //
+            user1 = GetLine(file_users, 43);
+            cbdefois = Regex.Matches(user1, "<strong>").Count;
+            if (cbdefois == 2)
+            {
+                string userB = Helpers.GetStringInBetween("<strong>", "</strong>", user1, true, true);
+                userB = userB.Replace("<del>", "");
+                userB = userB.Replace("</del>", "");
+                userB = userB.Replace("<strong>", "");
+                userB = userB.Replace("</strong>", "");
+                user1 = user1.Replace("<strong>" + userB + "</strong>", null);
+                if (!xx.Contains(userB))
+                {
+                    xx.Add(userB);
+                }
+            }
+            user = Helpers.GetStringInBetween("<strong>", "</strong>", user1, false, false);
+            user.Replace("<del>", "");
+            user.Replace("</del>", "");
+            if (!xx.Contains(user))
+            {
+                xx.Add(user);
+            }
+            //
+            user1 = GetLine(file_users, 50);
+            cbdefois = Regex.Matches(user1, "<strong>").Count;
+            if (cbdefois == 2)
+            {
+                string userB = Helpers.GetStringInBetween("<strong>", "</strong>", user1, true, true);
+                userB = userB.Replace("<del>", "");
+                userB = userB.Replace("</del>", "");
+                userB = userB.Replace("<strong>", "");
+                userB = userB.Replace("</strong>", "");
+                user1 = user1.Replace("<strong>" + userB + "</strong>", null);
+                if (!xx.Contains(userB))
+                {
+                    xx.Add(userB);
+                }
+            }
+            user = Helpers.GetStringInBetween("<strong>", "</strong>", user1, false, false);
+            user.Replace("<del>", "");
+            user.Replace("</del>", "");
+            if (!xx.Contains(user))
+            {
+                xx.Add(user);
+            }
+            //
+            user1 = GetLine(file_users, 57);
+            cbdefois = Regex.Matches(user1, "<strong>").Count;
+            if (cbdefois == 2)
+            {
+                string userB = Helpers.GetStringInBetween("<strong>", "</strong>", user1, true, true);
+                userB = userB.Replace("<del>", "");
+                userB = userB.Replace("</del>", "");
+                userB = userB.Replace("<strong>", "");
+                userB = userB.Replace("</strong>", "");
+                user1 = user1.Replace("<strong>" + userB + "</strong>", null);
+                if (!xx.Contains(userB))
+                {
+                    xx.Add(userB);
+                }
+            }
+            user = Helpers.GetStringInBetween("<strong>", "</strong>", user1, false, false);
+            user.Replace("<del>", "");
+            user.Replace("</del>", "");
+            if (!xx.Contains(user))
+            {
+                xx.Add(user);
+            }
+            //
+            user1 = GetLine(file_users, 64);
+            cbdefois = Regex.Matches(user1, "<strong>").Count;
+            if (cbdefois == 2)
+            {
+                string userB = Helpers.GetStringInBetween("<strong>", "</strong>", user1, true, true);
+                userB = userB.Replace("<del>", "");
+                userB = userB.Replace("</del>", "");
+                userB = userB.Replace("<strong>", "");
+                userB = userB.Replace("</strong>", "");
+                user1 = user1.Replace("<strong>" + userB + "</strong>", null);
+                if (!xx.Contains(userB))
+                {
+                    xx.Add(userB);
+                }
+            }
+            user = Helpers.GetStringInBetween("<strong>", "</strong>", user1, false, false);
+            user.Replace("<del>", "");
+            user.Replace("</del>", "");
+            if (!xx.Contains(user))
+            {
+                xx.Add(user);
+            }
+            //
+            user1 = GetLine(file_users, 71);
+            cbdefois = Regex.Matches(user1, "<strong>").Count;
+            if (cbdefois == 2)
+            {
+                string userB = Helpers.GetStringInBetween("<strong>", "</strong>", user1, true, true);
+                userB = userB.Replace("<del>", "");
+                userB = userB.Replace("</del>", "");
+                userB = userB.Replace("<strong>", "");
+                userB = userB.Replace("</strong>", "");
+                user1 = user1.Replace("<strong>" + userB + "</strong>", null);
+                if (!xx.Contains(userB))
+                {
+                    xx.Add(userB);
+                }
+            }
+            user = Helpers.GetStringInBetween("<strong>", "</strong>", user1, false, false);
+            user.Replace("<del>", "");
+            user.Replace("</del>", "");
+            if (!xx.Contains(user))
+            {
+                xx.Add(user);
+            }
+            //
+            user1 = GetLine(file_users, 78);
+            cbdefois = Regex.Matches(user1, "<strong>").Count;
+            if (cbdefois == 2)
+            {
+                string userB = Helpers.GetStringInBetween("<strong>", "</strong>", user1, true, true);
+                userB = userB.Replace("<del>", "");
+                userB = userB.Replace("</del>", "");
+                userB = userB.Replace("<strong>", "");
+                userB = userB.Replace("</strong>", "");
+                user1 = user1.Replace("<strong>" + userB + "</strong>", null);
+                if (!xx.Contains(userB))
+                {
+                    xx.Add(userB);
+                }
+            }
+            user = Helpers.GetStringInBetween("<strong>", "</strong>", user1, false, false);
+            user.Replace("<del>", "");
+            user.Replace("</del>", "");
+            if (!xx.Contains(user))
+            {
+                xx.Add(user);
+            }
+            //
+            user1 = GetLine(file_users, 85);
+            cbdefois = Regex.Matches(user1, "<strong>").Count;
+            if (cbdefois == 2)
+            {
+                string userB = Helpers.GetStringInBetween("<strong>", "</strong>", user1, true, true);
+                userB = userB.Replace("<del>", "");
+                userB = userB.Replace("</del>", "");
+                userB = userB.Replace("<strong>", "");
+                userB = userB.Replace("</strong>", "");
+                user1 = user1.Replace("<strong>" + userB + "</strong>", null);
+                if (!xx.Contains(userB))
+                {
+                    xx.Add(userB);
+                }
+            }
+            user = Helpers.GetStringInBetween("<strong>", "</strong>", user1, false, false);
+            user.Replace("<del>", "");
+            user.Replace("</del>", "");
+            if (!xx.Contains(user))
+            {
+                xx.Add(user);
+            }
+            //
+            user1 = GetLine(file_users, 92);
+            cbdefois = Regex.Matches(user1, "<strong>").Count;
+            if (cbdefois == 2)
+            {
+                string userB = Helpers.GetStringInBetween("<strong>", "</strong>", user1, true, true);
+                userB = userB.Replace("<del>", "");
+                userB = userB.Replace("</del>", "");
+                userB = userB.Replace("<strong>", "");
+                userB = userB.Replace("</strong>", "");
+                user1 = user1.Replace("<strong>" + userB + "</strong>", null);
+                if (!xx.Contains(userB))
+                {
+                    xx.Add(userB);
+                }
+            }
+            user = Helpers.GetStringInBetween("<strong>", "</strong>", user1, false, false);
+            user.Replace("<del>", "");
+            user.Replace("</del>", "");
+            if (!xx.Contains(user))
+            {
+                xx.Add(user);
+            }
+            //
+            user1 = GetLine(file_users, 99);
+            cbdefois = Regex.Matches(user1, "<strong>").Count;
+            if (cbdefois == 2)
+            {
+                string userB = Helpers.GetStringInBetween("<strong>", "</strong>", user1, true, true);
+                userB = userB.Replace("<del>", "");
+                userB = userB.Replace("</del>", "");
+                userB = userB.Replace("<strong>", "");
+                userB = userB.Replace("</strong>", "");
+                user1 = user1.Replace("<strong>" + userB + "</strong>", null);
+                if (!xx.Contains(userB))
+                {
+                    xx.Add(userB);
+                }
+            }
+            user = Helpers.GetStringInBetween("<strong>", "</strong>", user1, false, false);
+            user.Replace("<del>", "");
+            user.Replace("</del>", "");
+            if (!xx.Contains(user))
+            {
+                xx.Add(user);
+            }
+            //
+            user1 = GetLine(file_users, 106);
+            cbdefois = Regex.Matches(user1, "<strong>").Count;
+            if (cbdefois == 2)
+            {
+                string userB = Helpers.GetStringInBetween("<strong>", "</strong>", user1, true, true);
+                userB = userB.Replace("<del>", "");
+                userB = userB.Replace("</del>", "");
+                userB = userB.Replace("<strong>", "");
+                userB = userB.Replace("</strong>", "");
+                user1 = user1.Replace("<strong>" + userB + "</strong>", null);
+                if (!xx.Contains(userB))
+                {
+                    xx.Add(userB);
+                }
+            }
+            user = Helpers.GetStringInBetween("<strong>", "</strong>", user1, false, false);
+            user.Replace("<del>", "");
+            user.Replace("</del>", "");
+            if (!xx.Contains(user))
+            {
+                xx.Add(user);
+            }
+            return xx;
+        }
+
+        /// <summary>
+        /// Permet de savoir si un membre poste mass de 'Merci du partage'
+        /// </summary>
+        /// <param name="UserID">le User ID du membre</param>
+        /// <returns></returns>
+        public static bool IsUserAMerci(string UserID)
+        {
+            var x = GetMemberinfo(ID2Nickname(UserID));
+
+            if (x != null)
+            {
+                int memberpost = Convert.ToInt32(x[1]);
+                /* 
+            Pour 1 page on vérifie 8 merci
+            Pour 2 pages 16 
+            etc...
+            pour X=1 Y=8
+            pour X=2 Y=16
+            Rapport R {X,Y} = x/0.16 Ry = y'{x/0.16} || x/Ry =0.16
+            */
+                int wordCount = 0;
+                var pagereponses =
+                    MyWebClient.DownloadString("http://hack-free.net/search.php?action=finduser&uid=" + UserID);
+                pagereponses = pagereponses.ToLower();
+                var count = Regex.Matches(pagereponses, "merci").Count;
+                int percentComplete = (int) Math.Round((double) (100*count)/memberpost);
+                return percentComplete >= 50;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Permet de récupérer le nombre de message d'un membre
+        /// </summary>
+        /// <param name="username">Le pseudo du membre</param>
+        /// <returns></returns>
+        public static int GetUserMessageCount(string username)
+        {
+            var nombremessage = 0;
+            var userid = Nickname2ID(username);
+            var reply = MyWebClient.DownloadString("http://hack-free.net/search.php?action=finduser&uid=" + userid);
+            //<span class="pages">Pages (5) :</span>
+            var source1 = "<span class=\"pages\">Pages ";
+            var source2 = " :</span>";
+            var pagenumber = Helpers.GetStringInBetween(source1, source2, reply, false, false);
+            pagenumber = pagenumber.Replace("(","");
+            pagenumber = pagenumber.Replace(")", "");
+            if (pagenumber != "")
+            {
+                //<span class="pagination_current">1</span>
+                //<a href="search.php?action=results&amp;sid=aa9c3084e675404e26d0057faea4a9c4&amp;sortby=dateline&amp;order=desc&amp;uid=&amp;page=2" class="pagination_page">2</a>
+                source1 = ">1</span>";
+                source2 = "class=\"pagination_page\">2</a>";
+                var url = Helpers.GetStringInBetween(source1, source2, reply, false, false);
+                url = url.Replace("<a href=\"", "");
+                url = url.Replace("\" ", "");
+                url = url.Replace(@"\n", "");
+                url = url.Replace("page=2", "page=");
+                url = url.Replace("&amp;", "&");
+                url = url.Trim();
+                //"search.php?action=results&amp;sid=897b4e2d867108d53140c535f4212867&amp;sortby=dateline&amp;order=desc&amp;uid=&amp;page="
+                for (int i = 0; i < int.Parse(pagenumber); i++)
+                {
+                    //1 page complette = 50 messages
+                    var page = MyWebClient.DownloadString("http://hack-free.net/" + url + i);
+                    if (page.ToLower().Contains("les termes de la recherche."))
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        var xeno = CountStringOccurrences(page, "width=\"2%\">");
+                        nombremessage += xeno;
+                    }
+                }
+            }
+            else
+            {
+                var xeno = CountStringOccurrences(reply, "width=\"2%\">");
+                nombremessage += xeno;
+            }
+
+            return nombremessage;
+        }
+
+
+
+
+        #region private method to fetch & scrape data
+
+        /// <summary>
+        /// This method returns the percentage-formatted string.
+        /// </summary>
+        static string GetPercentageString(double ratio)
+        {
+            return ratio.ToString("0.0%");
+        }
+
+
+        /// <summary>
+        /// Count occurrences of strings.
+        /// </summary>
+        private static int CountStringOccurrences(string text, string pattern)
+        {
+            // Loop through all instances of the string 'text'.
+            int count = 0;
+            int i = 0;
+            while ((i = text.IndexOf(pattern, i)) != -1)
+            {
+                i += pattern.Length;
+                count++;
+            }
+            return count;
+        }
+
+        /// <summary>
+        /// Permet de récupérer une ertaine ligne d'un fichier texte
+        /// </summary>
+        /// <param name="fileName">Le fichier source</param>
+        /// <param name="line">La ligne</param>
+        /// <returns></returns>
+        private static string GetLine(string fileName, int line)
+        {
+            using (var sr = new StreamReader(fileName))
+            {
+                for (var i = 1; i < line; i++)
+                    sr.ReadLine();
+                return sr.ReadLine();
+            }
+        }
 
         /// <summary>
         /// Grosse methode bien trash-code qui sert de fourre-tout
@@ -335,60 +943,6 @@ namespace HFAPI
             GetReputation();
             GetInscriptionDate();
             GetAverto();
-        }
-
-
-
-        #region private method to fetch & scrape data
-
-
-        /// <summary>
-        /// Permet de récupérer le pseudonyme à partir de l'UserID
-        /// </summary>
-        /// <returns></returns>
-        private static string ID2Nickname(string memberID)
-        {
-            string nickname;
-            var profile = MyWebClient.DownloadString("http://hack-free.net/User-");
-            //http://hack-free.net/User-1094
-            //<span class="active">Profil de `Kysura~_^</span>
-            var src1 = "<span class=\"active\">Profil de ";
-            var src2 = "</span>";
-            var entries2 = Helpers.GetStringInBetween(src1, src2,
-                profile, false, false);
-            nickname = entries2;
-            return nickname;
-        }
-
-        /// <summary>
-        /// Permet de récupérer l'userID à partir d'un pseudo
-        /// </summary>
-        /// <param name="pseudo"></param>
-        /// <returns></returns>
-        private static string Nickname2ID(string pseudo)
-        {
-            string ID = "";
-
-            var response = MyWebClient.UploadValues("http://hack-free.net/memberlist.php", new NameValueCollection()
-           {
-               { "username", pseudo },
-               { "website", ""},
-               { "sort", "lastvisit" },
-               { "order", "ascending" },
-               { "submit", "Rechercher" }
-           });
-            var result = System.Text.Encoding.UTF8.GetString(response);
-            //<td class="trow1"><a href="http://hack-free.net/User-84">Prometheus</a><br/>
-            var src1 = "<td class=\"trow1\"><a href=\"http://hack-free.net/User-";
-            var src2 = ">Prometheus</a><br/>";
-            var entries2 = Helpers.GetStringInBetween(src1, src2,
-                result, false, false);
-            //84\"
-            entries2 = entries2.Trim('"');
-            entries2 = entries2.Replace(@"\", "");
-
-            ID = entries2;
-            return ID;
         }
 
         private static int GetUserID()
@@ -449,12 +1003,7 @@ namespace HFAPI
 
         private static int Getpostcount()
         {
-            if (PostCount != 0)
-            {
-                return PostCount;
-            }
-            else
-            {
+            
                 try
                 {
                     var postcount = 0;
@@ -472,17 +1021,11 @@ namespace HFAPI
 
                     throw new Exception("Error : Cannot fetch post count !");
                 }
-            }
         }
 
         private static  int GetMemberReferedcount()
         {
-            if (ReferencedMembers != 0)
-            {
-                return ReferencedMembers;
-            }
-            else
-            {
+           
                 try
                 {
                     var refmember = 0;
@@ -503,18 +1046,11 @@ namespace HFAPI
 
                     throw new Exception("Error : Cannot fetch referenced members count !");
                 }
-            }
         }
 
         private static  string GetRatio()
         {
-            if (Ratio != null)
-            {
-                return Ratio;
-            }
-            else
-            {
-                try
+            try
                 {
                     var rat = "";
                     var pagemember = Userpanel;
@@ -553,18 +1089,12 @@ namespace HFAPI
 
                     throw new Exception("Error : Cannot fetch ratio count !");
                 }
-            }
             return null;
         }
 
         private static  string GetUsernameChange()
         {
-            if (UsernameChange != null)
-            {
-                return UsernameChange;
-            }
-            else
-            {
+           
                 try
                 {
                     var usernamechng = "";
@@ -588,17 +1118,11 @@ namespace HFAPI
 
                     throw new Exception("Error : Cannot fetch former username count !");
                 }
-            }
         }
 
         private static  string GetMerci()
         {
-            if (Merci != null)
-            {
-                return Merci;
-            }
-            else
-            {
+           
                 try
                 {
                     var thanks = "";
@@ -622,17 +1146,11 @@ namespace HFAPI
 
                     throw new Exception("Error : Cannot fetch 'Merci' count !");
                 }
-            }
         }
 
         private static  string GetCredit()
         {
-            if (Credit != null)
-            {
-                return Credit;
-            }
-            else
-            {
+            
                 try
                 {
                     var cred = "";
@@ -658,17 +1176,11 @@ namespace HFAPI
 
                     throw new Exception("Error : Cannot fetch credit count !");
                 }
-            }
         }
 
         private static  string GetAvatarUrl()
         {
-            if (AvatarURL != null)
-            {
-                return AvatarURL;
-            }
-            else
-            {
+           
                 try
                 {
                     var avatar = "";
@@ -694,17 +1206,11 @@ namespace HFAPI
 
                     throw new Exception("Error : Cannot fetch avatar url !");
                 }
-            }
         }
 
         private static  string GetReportedMessage()
         {
-            if (ReportedMessage != null)
-            {
-                return ReportedMessage;
-            }
-            else
-            {
+           
                 try
                 {
                     var report = "";
@@ -728,17 +1234,11 @@ namespace HFAPI
 
                     throw new Exception("Error : Cannot fetch reported messages count !");
                 }
-            }
         }
 
         private static  string GetGroupe()
         {
-            if (Groupe != null)
-            {
-                return Groupe;
-            }
-            else
-            {
+            
                 try
                 {
                     var groupe = "";
@@ -765,17 +1265,11 @@ namespace HFAPI
 
                     throw new Exception("Error : Cannot fetch main group !");
                 }
-            }
         }
 
         private static string GetAverto()
         {
-            if (Avertissement != null)
-            {
-                return Avertissement;
-            }
-            else
-            {
+           
                 try
                 {
                     var averto = "";
@@ -797,45 +1291,33 @@ namespace HFAPI
 
                     throw new Exception("Error : Cannot fetch avertissement !");
                 }
-            }
         }
 
         private static  string GetReputation()
         {
-            if (Reputation != null)
-            {
-                return Reputation;
-            }
-            else
-            {
-                try
-                {
-                    var rep = "";
-                    var pagemember = Userpanel;
-                    //<strong class="reputation_positive">4</strong>
-                    var entries2 = Helpers.GetStringInBetween("<strong class=\"reputation_positive\">", "</strong>",
-                        pagemember, false, false);
-                    //4
-                    rep = entries2;
-                    Reputation = rep;
-                    return rep;
-                }
-                catch (Exception)
-                {
 
-                    throw new Exception("Error : Cannot fetch reputation !");
-                }
+            try
+            {
+                var rep = "";
+                var pagemember = Userpanel;
+                //<strong class="reputation_positive">4</strong>
+                var entries2 = Helpers.GetStringInBetween("<strong class=\"reputation_positive\">", "</strong>",
+                    pagemember, false, false);
+                //4
+                rep = entries2;
+                Reputation = rep;
+                return rep;
+            }
+            catch (Exception)
+            {
+
+                throw new Exception("Error : Cannot fetch reputation !");
             }
         }
 
         private static  string GetInscriptionDate()
         {
-            if (InscriptionDate != null)
-            {
-                return InscriptionDate;
-            }
-            else
-            {
+           
                 try
                 {
                     var date = "";
@@ -853,7 +1335,6 @@ namespace HFAPI
 
                     throw new Exception("Error : Cannot fetch inscription date !");
                 }
-            }
         }
 
         #endregion

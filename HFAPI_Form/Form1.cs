@@ -34,6 +34,10 @@ namespace HFAPI_Form
             lblReported.Text += User.ReportedMessage;
             lblGroupe.Text += User.Groupe;
 
+            //var test = User.GetMemberinfo("Chewbaka");
+
+            var xeno = User.IsUserAMerci("3189");
+
         }
     }
 }
